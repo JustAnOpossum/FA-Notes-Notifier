@@ -1,0 +1,20 @@
+{
+    "manifest_version": 2,
+
+    "name": "FA Notes Notifier",
+    "description": "Notifies you of new notes on furaffinity",
+    "version": "1.0.0",
+
+    "browser_action": {
+        "default_icon": "icon16.png",
+        "default_popup": "settings.html"
+    },
+    "icons": { "16": "icon16.png",
+           "48": "icon48.png",
+          "128": "icon128.png" },
+    "permissions": ["*://*.furaffinity.net/*", "storage", "notifications", "*://*.facdn.net/*", "tabs"],
+    "background": {
+      "scripts": ["jquery.js", "getNotes.js"],
+      "persistent": true
+    }
+}
