@@ -12,7 +12,7 @@
     "icons": { "16": "icon16.png",
            "48": "icon48.png",
           "128": "icon128.png" },
-    "permissions": ["*://*.furaffinity.net/*", "storage", "notifications", "*://*.facdn.net/*", "tabs"],
+    "permissions": ["*://*.furaffinity.net/*", "storage", "notifications", "*://*.facdn.net/*", "tabs", "alarms"],
     "background": {
       "scripts": ["jquery.js", "getNotes.js"],
       "persistent": true

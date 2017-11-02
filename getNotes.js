@@ -1,26 +1,21 @@
 let ids = {} //Object with ids for notification
-let interval
 let objnotes = {} //Global so chrome can clear local storage
 
 chrome.storage.sync.get('refresh', function(value) { //Gets user save value
    if (jQuery.isEmptyObject(value)) {
-      chrome.storage.sync.set({ refresh: 300000 })
+      chrome.storage.sync.set({ refresh: 3 })
    }
 })
 
 function getNewNotes() {
    $('body').load('https://www.furaffinity.net/msg/pms/', function() {
-      let betaUnread = $('.notelinknote-unread').toArray()
-      let betaRead = $('.notelinknote-read').toArray()
       let arrUnread = $('.note-unread').toArray()
       let arrRead = $('.note-read').toArray()
-      if (arrRead.length > 0) {
+      if (arrUnread.length > 0) {
          notes(arrUnread, arrRead, false)
-      } else {
-         notes(betaUnread, betaRead, true)
       }
 
-      function notes(unread, read, beta) {
+      function notes(unread, read) {
         for (let x = 0; x < read.length; x++) { //Clears messages from storage that have been read
           let note = $(read[x]).attr('href')
            chrome.storage.local.get(note, function(item) {
@@ -31,16 +26,8 @@ function getNewNotes() {
         }
          for (let x = 0; x < unread.length; x++) {
             let note = $(unread[x]).attr('href')
-            let user
-            let title
-            if (beta) {
-              user = $(unread[0]).parent().find('.link-override-no-icon').text().replace('~', '')
-              title = $(unread[x]).text().replace('\n                ', '').replace('            ', '')
-            }
-            else {
-              user = $(unread[x]).parent().parent().find('.col-from').children().text()
-              title = $(unread[x]).text()
-            }
+            let user = $(unread[x]).parent().parent().find('.col-from').children().text()
+            let title = $(unread[x]).text()
             chrome.storage.local.get(note, function(item) { //Looks for note in local to make sure notification was not sent.
                if (jQuery.isEmptyObject(item)) {
                   let json = new Object()
@@ -75,15 +62,20 @@ chrome.notifications.onClicked.addListener(function(clicked) {
 })
 
 function start() {
-   getNewNotes()
+  getNewNotes()
    chrome.storage.sync.get('refresh', function(value) { //Gets user save value
-      interval = setInterval(getNewNotes, (value.refresh || 300000))
+      chrome.alarms.create('updateNotes', {periodInMinutes: value.refresh})
    })
 }
 
+chrome.alarms.onAlarm.addListener(() => {
+  getNewNotes()
+})
+
 function update(val) {
-   clearInterval(interval)
-   interval = setInterval(getNewNotes, val)
+   chrome.alarms.clear('updateNotes', () => {
+    chrome.alarms.create('updateNotes', {periodInMinutes: val})
+   })
 }
 
 start()
