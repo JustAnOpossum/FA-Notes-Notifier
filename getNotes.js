@@ -64,6 +64,11 @@ chrome.notifications.onClicked.addListener(function(clicked) {
 function start() {
   getNewNotes()
    chrome.storage.sync.get('refresh', function(value) { //Gets user save value
+    if (value.refresh > 1000) {
+      chrome.storage.sync.set({refresh:5}, () => {
+        chrome.runtime.reload()
+      })
+    }
       chrome.alarms.create('updateNotes', {periodInMinutes: value.refresh})
    })
 }
