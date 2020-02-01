@@ -1,20 +1,17 @@
-$('#saveBut').on('click', function(){
-  let value = parseInt($('#timenum').val())
-  if (!value) {
-    $('#error').text('Please enter a valid number.')
-  }
-  else {
-    console.log(value, typeof value)
-    chrome.extension.getBackgroundPage().update(value)
-    chrome.storage.sync.set({refresh:value})
-    $('#time').text(`Current Refresh Rate: ${value} Minutes`)
-  }
+browser.storage.local.get().then(item => {
+  updateInfo((item.refresh || 5))
 })
 
-$('#refresh').on('click', function(){
-  chrome.extension.getBackgroundPage().getNewNotes()
-})
+document.getElementById("saveButton").onclick = function () {
+  let newRefrehTime = document.getElementById("timenum").value
+  let convertNumber = parseInt(newRefrehTime)
+  if (isNaN(convertNumber) || convertNumber === 0) { //If they did not enter number then do nothing
+    return
+  }
+  browser.storage.local.set({ refresh: convertNumber })
+  updateInfo(convertNumber)
+}
 
-chrome.storage.sync.get('refresh', function(rate){
-  $('#time').text(`Current Refresh Rate: ${rate.refresh} Minutes`)
-})
+function updateInfo(newUpdateTime) {
+  document.getElementById("time").innerHTML = "Current Refresh Time is: " + newUpdateTime + " Minutes"
+}

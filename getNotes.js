@@ -1,92 +1,67 @@
-let ids = {} //Object with ids for notification
-let objnotes = {} //Global so chrome can clear local storage
-
-chrome.storage.sync.get('refresh', function (value) { //Gets user save value
-  if (jQuery.isEmptyObject(value)) {
-    chrome.storage.sync.set({ refresh: 3 })
+browser.storage.local.get().then(query => {
+  if (query.refresh === undefined) {
+    browser.storage.local.set({ refresh: 5 })
+    browser.storage.local.set({ sent: [] })
   }
+  browser.alarms.create("updateNotes", { periodInMinutes: query.refresh || 5, when: 1000 })
 })
 
-function getNewNotes() {
-  $('body').load('https://www.furaffinity.net/msg/pms/', function () {
-    let arrRead
-    let arrUnread
-    if ($('.note-unread')) {
-      arrUnread = $('.note-unread').toArray()
-    }
-    if ($('.note-read')) {
-      arrRead = $('.note-read').toArray()
-    }
-    if (arrUnread.length > 0) {
-      notes(arrUnread, arrRead, false)
-    }
+browser.alarms.onAlarm.addListener(handleAlarm)
 
-    function notes(unread, read) {
-      for (let x = 0; x < read.length; x++) { //Clears messages from storage that have been read
-        let note = $(read[x]).attr('href')
-        chrome.storage.local.get(note, function (item) {
-          if (!jQuery.isEmptyObject(item)) {
-            chrome.storage.local.remove(note)
-          }
-        })
-      }
-      for (let x = 0; x < unread.length; x++) {
-        let note = $(unread[x]).attr('href')
-        let user = $(unread[x]).parent().parent().find('.col-from').children().text()
-        let title = $(unread[x]).text()
-        chrome.storage.local.get(note, function (item) { //Looks for note in local to make sure notification was not sent.
-          if (jQuery.isEmptyObject(item)) {
-            let json = new Object()
-            json[note] = true
-            chrome.storage.local.set(json)
-            $('body').load('https://www.furaffinity.net/user/' + user, function () { //Gets user profile picture for notification
-              let notificationOpts = {
-                type: 'basic',
-                iconUrl: ($('.avatar').first().attr('src')).replace('//', 'https://'),
-                title: title,
-                message: 'New message from ' + user,
-                requireInteraction: true,
-                isClickable: true
-              }
-              chrome.notifications.create(notificationOpts, function (id) {
-                ids[id] = 'https://www.furaffinity.net' + note
-                objnotes[id] = note
-              })
-            })
-          }
-        })
-      }
-    }
+function handleAlarm(alarmInfo) {
+  switch (alarmInfo.name) {
+    case "updateNotes":
+      getNewNotes()
+      break;
+    default:
+  }
+}
+
+async function getNewNotes() { //Called first starts events to get new notes.
+  let response = await fetch("https://www.furaffinity.net/msg/pms/")
+  let text = await response.text()
+  let notesDOM = new DOMParser().parseFromString(text, "text/html")
+  let unreadNotes = notesDOM.getElementsByClassName("notelinknote-unread")
+  for (i = 0; i <= unreadNotes.length - 1; i++) {
+    await handleUnreadNote(unreadNotes[i])
+  }
+}
+
+async function handleUnreadNote(inputNote) { //Called each time for a new note.
+  let parentNote = inputNote.parentElement.parentElement.parentElement.parentElement //The parent root element for the notes container
+  let senderName = parentNote.getElementsByClassName("note-list-sender")[0].getElementsByTagName("a")[0].text
+  let noteURL = parentNote.getElementsByClassName("notelinknote-unread")[0].pathname
+
+  let query = await browser.storage.local.get()
+  let sentArray = query.sent
+  if (sentArray.includes(noteURL)) {
+    return
+  }
+  sentArray.push(noteURL)
+  browser.storage.local.set({ sent: sentArray })
+
+  let profilePictureURL = await getProfileURL(senderName)
+  let finalNoteURL = "https://furaffinity.net" + noteURL
+
+  sendNotification(finalNoteURL, profilePictureURL, senderName)
+  return
+}
+
+function sendNotification(noteURL, profilePictureURL, senderName) { //Sends the notification
+  let notification = browser.notifications.create({
+    "type": "basic",
+    "title": "FA Notes Notifier",
+    "message": "New note from " + senderName,
+    "iconUrl": profilePictureURL,
   })
 }
 
-chrome.notifications.onClicked.addListener(function (clicked) {
-  chrome.tabs.create({ url: ids[clicked] })
-  chrome.notifications.clear(clicked)
-  delete ids[clicked]
-  chrome.storage.local.remove(objnotes[clicked])
-})
+async function getProfileURL(username) { //Gets profile picture from the FA page.
+  let response = await fetch("https://furaffinity.net/user/" + username)
+  let text = await response.text()
+  let profilePageDOM = new DOMParser().parseFromString(text, "text/html")
 
-function start() {
-  getNewNotes()
-  chrome.storage.sync.get('refresh', function (value) { //Gets user save value
-    if (value.refresh > 1000) {
-      chrome.storage.sync.set({ refresh: 5 }, () => {
-        chrome.runtime.reload()
-      })
-    }
-    chrome.alarms.create('updateNotes', { periodInMinutes: value.refresh })
-  })
+  let profilePicture = "http://" + profilePageDOM.getElementsByClassName("user-nav-avatar")[0].src.split("//")[1]
+  return profilePicture
 }
 
-chrome.alarms.onAlarm.addListener(() => {
-  getNewNotes()
-})
-
-function update(val) {
-  chrome.alarms.clear('updateNotes', () => {
-    chrome.alarms.create('updateNotes', { periodInMinutes: val })
-  })
-}
-
-start()
